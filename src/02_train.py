@@ -37,8 +37,11 @@ processor = WhisperProcessor.from_pretrained(model_name)
 model = WhisperForConditionalGeneration.from_pretrained(model_name)
 model.to(device)
 
-# force Japanese decoding
-processor.tokenizer.set_language("ja")
+model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
+    language="ja",
+    task="transcribe"
+)
+
 model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(language="ja", task="transcribe")
 
 # -------------------------
