@@ -24,6 +24,8 @@ print("Device:", device)
 # LOAD CSV
 # -------------------------
 df = pd.read_csv("dataset_wav_jp.csv")   # audio,text
+df = df.rename(columns={"filename": "audio", "label": "text"})
+df["audio"] = df["audio"].apply(lambda x: os.path.join("audio", x))
 dataset = Dataset.from_pandas(df)
 dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
 
