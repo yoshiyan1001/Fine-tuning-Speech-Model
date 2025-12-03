@@ -25,7 +25,7 @@ print("Device:", device)
 # -------------------------
 df = pd.read_csv("/storage/brno12-cerit/home/yoshiki1001/AudioProcess/Fine-tuning-Speech-Model/src/dataset_wav_jp.csv")   # audio,text
 df = df.rename(columns={"filename": "audio", "label": "text"})
-df["audio"] = df["audio"].apply(lambda x: os.path.join("audio", x))
+df["audio"] = df["audio"].apply(lambda x: os.path.join("audioData_16k", x))
 dataset = Dataset.from_pandas(df)
 dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
 
@@ -37,7 +37,12 @@ processor = WhisperProcessor.from_pretrained(model_name)
 model = WhisperForConditionalGeneration.from_pretrained(model_name)
 model.to(device)
 
-# force Japanese decoding
+
+model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
+    language="ja",
+    task="transcribe"
+)
+
 model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(language="ja", task="transcribe")
 
 # -------------------------
@@ -54,8 +59,13 @@ def prepare(batch):
     )
 
     # target tokens (Japanese onomatopoeia)
-    with processor.as_target_processor():
-        labels = processor(batch["text"], return_tensors="pt").input_ids
+    labels = processor.tokenizer(
+    batch["text"],
+    return_tensors="pt",
+    padding="longest",
+    truncation=True
+).input_ids
+
 
     batch["input_features"] = inputs.input_features[0]
     batch["labels"] = labels[0]
