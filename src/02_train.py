@@ -96,7 +96,6 @@ trainer = Seq2SeqTrainer(
     args=training_args,
     train_dataset=dataset,
     tokenizer=processor,
-    predict_with_generate=True,   # <-- move it here
 )
 
 
