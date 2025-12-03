@@ -85,8 +85,7 @@ training_args = TrainingArguments(
     fp16=torch.cuda.is_available(),
     optim="adamw_torch",
     save_steps=200,
-    logging_steps=20,
-    predict_with_generate=True,
+    logging_steps=20
 )
 
 # -------------------------
