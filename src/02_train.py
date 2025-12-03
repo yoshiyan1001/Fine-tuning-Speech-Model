@@ -1,6 +1,7 @@
 import os
 import torch
 import torchaudio
+from transformers import Seq2SeqTrainingArguments
 import pandas as pd
 from datasets import Dataset, Audio
 from transformers import (
@@ -76,26 +77,32 @@ dataset = dataset.map(prepare)
 # -------------------------
 # TRAINING SETTINGS
 # -------------------------
-training_args = TrainingArguments(
-    output_dir="./whisper-ft",
-    per_device_train_batch_size=4,
-    gradient_accumulation_steps=2,
-    num_train_epochs=5,
-    learning_rate=1e-5,
-    fp16=torch.cuda.is_available(),
-    optim="adamw_torch",
-    save_steps=200,
-    logging_steps=20
+training_args = Seq2SeqTrainingArguments(
+    output_dir="./results",
+    evaluation_strategy="steps",
+    save_steps=500,
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+    learning_rate=5e-5,
+    weight_decay=0.01,
+    save_total_limit=2,
+    predict_with_generate=True,   # important for seq2seq
+    logging_steps=100,
+    num_train_epochs=3,
 )
+
 
 # -------------------------
 # TRAINER
 # -------------------------
+from transformers import Seq2SeqTrainer
+
 trainer = Seq2SeqTrainer(
     model=model,
-    args=training_args,
+    args=training_args,  # now has generation_config
     train_dataset=dataset,
-    tokenizer=processor,
+    eval_dataset=dataset,
+    tokenizer=processor  # or processing_class if using HF >=5.0
 )
 
 
