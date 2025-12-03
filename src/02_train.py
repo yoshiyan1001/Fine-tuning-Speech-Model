@@ -64,7 +64,7 @@ def prepare(batch):
     return_tensors="pt",
     padding="longest",
     truncation=True
-).input_ids
+    ).input_ids
 
 
     batch["input_features"] = inputs.input_features[0]
@@ -96,8 +96,10 @@ trainer = Seq2SeqTrainer(
     model=model,
     args=training_args,
     train_dataset=dataset,
-    tokenizer=processor.feature_extractor,
+    tokenizer=processor,
+    predict_with_generate=True,   # <-- move it here
 )
+
 
 trainer.train()
 
