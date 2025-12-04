@@ -1,16 +1,21 @@
 import os
 import torch
-import torchaudio
-from transformers import Seq2SeqTrainingArguments
 import pandas as pd
 from datasets import Dataset, Audio
+
 from transformers import (
     WhisperProcessor,
     WhisperForConditionalGeneration,
-    TrainingArguments,
-    Seq2SeqTrainer
+    Seq2SeqTrainingArguments,
+    Seq2SeqTrainer,
+    DataCollatorSpeechSeq2SeqWithPadding,
 )
+
 import wandb
+
+# -------------------------
+# WANDB LOGIN
+# -------------------------
 wandb.login(key="4f240b3f571d4a4f1b89d86666464454c4c9a2bc")
 
 
@@ -24,91 +29,110 @@ device = (
 )
 print("Device:", device)
 
+
 # -------------------------
 # LOAD CSV
 # -------------------------
-df = pd.read_csv("/storage/brno12-cerit/home/yoshiki1001/AudioProcess/Fine-tuning-Speech-Model/src/dataset_wav_jp.csv")   # audio,text
+df = pd.read_csv(
+    "/storage/brno12-cerit/home/yoshiki1001/AudioProcess/Fine-tuning-Speech-Model/src/dataset_wav_jp.csv"
+)
+
 df = df.rename(columns={"filename": "audio", "label": "text"})
 df["audio"] = df["audio"].apply(lambda x: os.path.join("audioData_16k", x))
+
 dataset = Dataset.from_pandas(df)
 dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
+
 
 # -------------------------
 # LOAD WHISPER MODEL
 # -------------------------
-model_name = "openai/whisper-small"   # or tiny, base, medium
+model_name = "openai/whisper-small"
 processor = WhisperProcessor.from_pretrained(model_name)
-model = WhisperForConditionalGeneration.from_pretrained(model_name)
-model.to(device)
+model = WhisperForConditionalGeneration.from_pretrained(model_name).to(device)
 
-
+# Force Japanese transcribe prefix
 model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
-    language="ja",
-    task="transcribe"
+    language="ja", task="transcribe"
 )
 
-model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(language="ja", task="transcribe")
 
 # -------------------------
 # PREPROCESS
 # -------------------------
 def prepare(batch):
+    # Audio → Whisper input features
     audio = batch["audio"]
 
-    # whisper input
     inputs = processor(
         audio["array"],
         sampling_rate=16000,
         return_tensors="pt"
     )
 
-    # target tokens (Japanese onomatopoeia)
+    # Japanese labels → tokens
     labels = processor.tokenizer(
-    batch["text"],
-    return_tensors="pt",
-    padding="longest",
-    truncation=True
+        batch["text"],
+        return_tensors="pt",
+        padding="longest",
+        truncation=True
     ).input_ids
 
-
     batch["input_features"] = inputs.input_features[0]
-    batch["labels"] = labels[0]
+
+    # Mask padding tokens with -100 so loss ignores them
+    labels = labels[0]
+    labels[labels == processor.tokenizer.pad_token_id] = -100
+    batch["labels"] = labels
+
     return batch
+
 
 dataset = dataset.map(prepare)
 
+
 # -------------------------
-# TRAINING SETTINGS
+# DATA COLLATOR (IMPORTANT)
+# -------------------------
+data_collator = DataCollatorSpeechSeq2SeqWithPadding(
+    processor=processor,
+    padding=True,
+)
+
+
+# -------------------------
+# TRAINING ARGUMENTS
 # -------------------------
 training_args = Seq2SeqTrainingArguments(
     output_dir="./results",
-    save_steps=500,
     per_device_train_batch_size=16,
     per_device_eval_batch_size=16,
     learning_rate=5e-5,
-    weight_decay=0.01,
-    save_total_limit=2,
-    predict_with_generate=True,   # important for seq2seq
-    logging_steps=100,
     num_train_epochs=3,
+    predict_with_generate=True,
+    logging_steps=50,
+    save_steps=500,
+    save_total_limit=2,
+    weight_decay=0.01,
+    fp16=torch.cuda.is_available(),  # use fp16 on GPU
 )
 
 
 # -------------------------
 # TRAINER
 # -------------------------
-from transformers import Seq2SeqTrainer
-
 trainer = Seq2SeqTrainer(
     model=model,
-    args=training_args,  # now has generation_config
+    args=training_args,
     train_dataset=dataset,
     eval_dataset=dataset,
-    tokenizer=processor  # or processing_class if using HF >=5.0
+    data_collator=data_collator,
+    processing_class=processor,  # new replacement for tokenizer=
 )
 
 
 trainer.train()
+
 
 # -------------------------
 # SAVE
