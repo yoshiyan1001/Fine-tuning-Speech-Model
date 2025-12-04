@@ -1,6 +1,5 @@
 import os
 import torch
-import torchaudio
 import pandas as pd
 from datasets import Dataset, Audio
 from transformers import (
@@ -12,12 +11,12 @@ from transformers import (
 import wandb
 
 # -------------------------
-# WANDB LOGIN
+# WANDB LOGIN (optional)
 # -------------------------
-wandb.login(key="YOUR_WANDB_KEY")
+wandb.login(key="4f240b3f571d4a4f1b89d86666464454c4c9a2bc")
 
 # -------------------------
-# DEVICE SETUP
+# DEVICE
 # -------------------------
 device = (
     "cuda" if torch.cuda.is_available()
@@ -29,7 +28,10 @@ print("Device:", device)
 # -------------------------
 # LOAD CSV
 # -------------------------
-df = pd.read_csv("/storage/brno12-cerit/home/yoshiki1001/AudioProcess/Fine-tuning-Speech-Model/src/dataset_wav_jp.csv")
+df = pd.read_csv(
+    "/storage/brno12-cerit/home/yoshiki1001/AudioProcess/Fine-tuning-Speech-Model/src/dataset_wav_jp.csv"
+)
+
 df = df.rename(columns={"filename": "audio", "label": "text"})
 df["audio"] = df["audio"].apply(lambda x: os.path.join("audioData_16k", x))
 
@@ -37,10 +39,9 @@ dataset = Dataset.from_pandas(df)
 dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
 
 # -------------------------
-# LOAD MODEL + PROCESSOR
+# LOAD WHISPER
 # -------------------------
 model_name = "openai/whisper-small"
-
 processor = WhisperProcessor.from_pretrained(model_name)
 model = WhisperForConditionalGeneration.from_pretrained(model_name).to(device)
 
@@ -50,13 +51,13 @@ model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
 )
 
 # -------------------------
-# PREPROCESS FUNCTION
+# PREPARE FUNCTION (batched)
 # -------------------------
 def prepare(batch):
-    audio = batch["audio"]
+    audio_arrays = [a["array"] for a in batch["audio"]]
 
     inputs = processor(
-        audio["array"],
+        audio_arrays,
         sampling_rate=16000,
         return_tensors="pt"
     )
@@ -68,37 +69,46 @@ def prepare(batch):
         truncation=True
     ).input_ids
 
-    batch["input_features"] = inputs.input_features[0]
-    batch["labels"] = labels[0]
-    return batch
+    return {
+        "input_features": inputs.input_features,
+        "labels": labels
+    }
 
-dataset = dataset.map(prepare)
+# batched=True にする
+dataset = dataset.map(prepare, batched=True)
+
+# 不要な列を削除
+dataset = dataset.remove_columns(["description", "category", "audio", "text"])
 
 # -------------------------
-# CUSTOM COLLATOR (no HF dependency)
+# DATA COLLATOR
 # -------------------------
 class WhisperDataCollator:
     def __init__(self, processor):
         self.processor = processor
 
     def __call__(self, features):
-        input_features = [f["input_features"] for f in features]
+        input_features = torch.stack([f["input_features"] for f in features])
         labels = [f["labels"] for f in features]
 
-        batch = {
-            "input_features": torch.stack(input_features),
-            "labels": torch.nn.utils.rnn.pad_sequence(
-                labels,
-                batch_first=True,
-                padding_value=self.processor.tokenizer.pad_token_id
-            )
+        labels = torch.nn.utils.rnn.pad_sequence(
+            labels,
+            batch_first=True,
+            padding_value=self.processor.tokenizer.pad_token_id
+        )
+
+        # Whisper の損失は PAD = -100 にする
+        labels[labels == self.processor.tokenizer.pad_token_id] = -100
+
+        return {
+            "input_features": input_features,
+            "labels": labels
         }
-        return batch
 
 data_collator = WhisperDataCollator(processor)
 
 # -------------------------
-# TRAINING ARGUMENTS
+# TRAINING ARGS
 # -------------------------
 training_args = Seq2SeqTrainingArguments(
     output_dir="./results",
@@ -128,7 +138,7 @@ trainer = Seq2SeqTrainer(
 trainer.train()
 
 # -------------------------
-# SAVE FINAL MODEL
+# SAVE
 # -------------------------
 model.save_pretrained("./whisper-ft")
 processor.save_pretrained("./whisper-ft")
