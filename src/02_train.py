@@ -10,6 +10,9 @@ from transformers import (
     TrainingArguments,
     Seq2SeqTrainer
 )
+import wandb
+wandb.login(key="4f240b3f571d4a4f1b89d86666464454c4c9a2bc")
+
 
 # -------------------------
 # SETUP DEVICE
