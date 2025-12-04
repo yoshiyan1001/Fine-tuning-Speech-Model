@@ -54,10 +54,10 @@ model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
 # PREPARE FUNCTION (batched)
 # -------------------------
 def prepare(batch):
-    audio_arrays = [a["array"] for a in batch["audio"]]
+    audio = batch["audio"]
 
     inputs = processor(
-        audio_arrays,
+        audio["array"],
         sampling_rate=16000,
         return_tensors="pt"
     )
@@ -69,15 +69,15 @@ def prepare(batch):
         truncation=True
     ).input_ids
 
-    return {
-        "input_features": inputs.input_features,
-        "labels": labels
-    }
+    # ⭐ ここが重要：必ず Tensor にする
+    batch["input_features"] = inputs.input_features[0].clone().detach()
+    batch["labels"] = labels[0].clone().detach()
 
-# batched=True にする
+    return batch
+
+
 dataset = dataset.map(prepare, batched=True)
 
-# 不要な列を削除
 dataset = dataset.remove_columns(["description", "category", "audio", "text"])
 
 # -------------------------
@@ -97,7 +97,6 @@ class WhisperDataCollator:
             padding_value=self.processor.tokenizer.pad_token_id
         )
 
-        # Whisper の損失は PAD = -100 にする
         labels[labels == self.processor.tokenizer.pad_token_id] = -100
 
         return {
