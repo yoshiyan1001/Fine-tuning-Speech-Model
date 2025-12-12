@@ -132,6 +132,11 @@ trainer = Seq2SeqTrainer(
     tokenizer=processor,
     data_collator=data_collator,
 )
+print("SAMPLE 0 input_features:", type(dataset[0]["input_features"]))
+print("SAMPLE 0 labels:", type(dataset[0]["labels"]))
+
+if isinstance(dataset[0]["input_features"], list):
+    print("input_features[0] type:", type(dataset[0]["input_features"][0]))
 
 trainer.train()
 
