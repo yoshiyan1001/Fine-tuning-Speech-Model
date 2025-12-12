@@ -97,7 +97,7 @@ def prepare(batch):
     return batch
 
 
-dataset = dataset.map(prepare)
+dataset = dataset.map(prepare, batched=False)
 
 
 # Remove unused columns
