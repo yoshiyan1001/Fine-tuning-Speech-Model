@@ -91,7 +91,7 @@ def prepare(batch):
         truncation=True
     ).input_ids
 
-    batch["input_features"] = inputs.input_features[0]
+    batch["input_features"] = inputs.input_features.squeeze(0)
     batch["labels"] = label_ids[0]
 
     return batch
