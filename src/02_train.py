@@ -153,7 +153,7 @@ training_args = Seq2SeqTrainingArguments(
     predict_with_generate=True,
     logging_steps=100,
     num_train_epochs=3,
-    evaluation_strategy="no",   # your dataset has no dev set
+  
 )
 
 
