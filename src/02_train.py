@@ -71,10 +71,10 @@ model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
 # -------------------------
 def prepare(batch):
     audio = batch["audio"]
-    print("\n--- PREPARE() DEBUG ---")
-    print("Audio path:", audio["path"])
-    print("Array type:", type(audio["array"]))
-    print("Array shape:", audio["array"].shape)
+    # print("\n--- PREPARE() DEBUG ---")
+    # print("Audio path:", audio["path"])
+    # print("Array type:", type(audio["array"]))
+    # print("Array shape:", audio["array"].shape)
     # 1. Convert audio to Whisper input features
     inputs = processor(
         audio["array"],
