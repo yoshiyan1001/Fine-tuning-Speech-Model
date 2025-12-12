@@ -69,8 +69,9 @@ def prepare(batch):
         truncation=True
     ).input_ids
 
-    batch["input_features"] = inputs.input_features
-    batch["labels"] = labels
+    # Convert batched tensors → list of single tensors
+    batch["input_features"] = [x for x in inputs.input_features]
+    batch["labels"] = [y for y in labels]
 
     return batch
 
