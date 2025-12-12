@@ -160,12 +160,12 @@ training_args = Seq2SeqTrainingArguments(
 # -------------------------
 # TRAINER
 # -------------------------
-print("\n===== DATASET SUMMARY =====")
-print("Dataset length:", len(dataset))
-print("Sample[0] keys:", dataset[0].keys())
-print("Sample[0] input_features shape:", dataset[0]["input_features"].shape)
-print("Sample[0] labels shape:", dataset[0]["labels"].shape)
-print("===========================\n")
+# print("\n===== DATASET SUMMARY =====")
+# print("Dataset length:", len(dataset))
+# print("Sample[0] keys:", dataset[0].keys())
+# print("Sample[0] input_features shape:", dataset[0]["input_features"].shape)
+# print("Sample[0] labels shape:", dataset[0]["labels"].shape)
+# print("===========================\n")
 trainer = Seq2SeqTrainer(
     model=model,
     args=training_args,
