@@ -74,10 +74,18 @@ def prepare(batch):
     batch["labels"] = [y for y in labels]
 
     return batch
+print(dataset[0]["audio"])
+print(type(dataset[0]["audio"]["array"]))
+print(dataset[0]["audio"]["array"][:20])  # first 20 samples
 
 dataset = dataset.map(prepare, batched=True)
 
 dataset = dataset.remove_columns(["description", "category", "audio", "text"])
+import os
+
+for i in range(5):
+    print(dataset[i]["audio"]["path"], os.path.exists(dataset[i]["audio"]["path"]))
+
 
 # -------------------------
 # DATA COLLATOR
