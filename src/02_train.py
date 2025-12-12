@@ -54,10 +54,10 @@ model.config.forced_decoder_ids = processor.get_decoder_prompt_ids(
 # PREPARE FUNCTION (batched)
 # -------------------------
 def prepare(batch):
-    audio = batch["audio"]
+    audio_arrays = [a["array"] for a in batch["audio"]]
 
     inputs = processor(
-        audio["array"],
+        audio_arrays,
         sampling_rate=16000,
         return_tensors="pt"
     )
@@ -65,16 +65,14 @@ def prepare(batch):
     labels = processor.tokenizer(
         batch["text"],
         return_tensors="pt",
-        padding="longest",
+        padding=True,
         truncation=True
     ).input_ids
 
-    # ⭐ ここが重要：必ず Tensor にする
-    batch["input_features"] = inputs.input_features[0].clone().detach()
-    batch["labels"] = labels[0].clone().detach()
+    batch["input_features"] = inputs.input_features
+    batch["labels"] = labels
 
     return batch
-
 
 dataset = dataset.map(prepare, batched=True)
 
